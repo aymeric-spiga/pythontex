@@ -1,0 +1,6 @@
+pythontex-files-*
+*.aux
+*.log
+*.pdf
+*.pytxcode
+

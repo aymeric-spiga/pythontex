@@ -1,0 +1,88 @@
+\documentclass[12pt]{scrartcl}
+\usepackage[english]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{pythontex}
+
+\usepackage{amsmath} % for align
+
+\begin{document}
+
+Le résultat d'une addition simple~$2+2$ est~\py{2+2}. Le célèbre nombre~$\pi$ vaut environ \pyc{from numpy import pi ; print(pi)} 
+
+\section{Développements limités}
+
+\begin{pyblock}
+import sympy as sym
+from sympy.abc import x
+func = sym.exp(x)
+dl = sym.series(func,x,0,2)
+print('\['+sym.latex(func)+'='+sym.latex(dl)+'\]')
+dl = sym.series(func,x,0,6)
+print('\['+sym.latex(func)+'='+sym.latex(dl)+'\]')
+\end{pyblock}
+\printpythontex
+
+\section{Dérivées et intégrales}
+
+\begin{pycode}
+functions = [sym.sin(x), sym.cos(x), sym.tan(x)]
+print(r"\begin{align*}")
+for fff in functions:
+ d = sym.Derivative(fff, x)
+ print(sym.latex(d) + "&=" + sym.latex(d.doit()) + r"\\")
+print(r"\end{align*}")
+\end{pycode}
+
+\begin{pycode}
+# printeg( [char1,char2,...] )
+# -- prints char1 = char2 = ...
+def printeg(arg,symbol=' = '):
+  zechar = '\[ '
+  nnn = len(arg)
+  for ii in range(nnn):
+    zechar = zechar + sym.latex(arg[ii])
+    if ii != nnn-1:
+      zechar = zechar + symbol
+  zechar = zechar + ' \]'
+  print(zechar)
+\end{pycode}
+
+\section{Intégrales}
+\begin{pyblock}
+import numpy as np
+x = sym.Symbol('x')
+i = sym.Integral(sym.exp(-x**2),(x,0,np.inf))
+ii = i.doit()
+iii = sym.N(ii,4)
+printeg( [i,ii,iii] )
+\end{pyblock}
+\printpythontex
+
+%\begin{pycode}
+%from scipy.integrate import quad
+%from numpy import inf, exp
+%myintegral = quad(lambda x: exp(-x)**2, 0, inf)[0]
+%print('$' + latex(myintegral) + '$')
+%\end{pycode}
+
+\section{Equations différentielles}
+\begin{pyblock}
+x = sym.Symbol('x')
+f = sym.Function('\mathcal{F}')
+i = sym.Eq(f(x).diff(x,x)+f(x),1)
+ii = sym.dsolve(i,f(x))
+printeg( [i,ii], symbol=' \qquad\Rightarrow\qquad ' )
+\end{pyblock}
+\printpythontex
+
+%%%% does not work
+%\begin{pycode}
+%V, I = sym.symbols("V I", cls=sym.Function)
+%RC, t, C, Vs, L, R1, V0, I0 = sym.symbols("RC t C Vs L R1 V0 I0")
+%system = [sym.Eq(V(t).diff(t), -1/RC*V(t) + I(t)/C), sym.Eq(I(t).diff(t), -R1/L*I(t) - 1/L*V(t) + Vs/L)]
+%ics = {V(0): V0, I(0): I0}
+%sym.dsolve(system, [V(t), I(t)], ics=ics)
+%\end{pycode}
+
+\end{document}

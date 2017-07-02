@@ -25,14 +25,15 @@ print('\['+sym.latex(func)+'='+sym.latex(dl)+'\]')
 
 \section{Dérivées et intégrales}
 
-\begin{pycode}
+\begin{pyblock}[][fontsize=\footnotesize]
 functions = [sym.sin(x), sym.cos(x), sym.tan(x)]
 print(r"\begin{align*}")
 for fff in functions:
  d = sym.Derivative(fff, x)
  print(sym.latex(d) + "&=" + sym.latex(d.doit()) + r"\\")
 print(r"\end{align*}")
-\end{pycode}
+\end{pyblock}
+\printpythontex
 
 \begin{pycode}
 # printeg( [char1,char2,...] )

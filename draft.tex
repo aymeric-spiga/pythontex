@@ -1,0 +1,459 @@
+\documentclass[12pt,hyperref]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{graphicx}
+\usepackage{natbib}
+\usepackage{color}
+\usepackage{amsmath}
+\usepackage[margin=1.5cm]{geometry}
+\usepackage{pythontex}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% PYTHONTEX SETTINGS %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+\setpythontexworkingdir{.}
+%%
+\begin{pycode}
+import sys
+import os
+def add_to_path(p):
+    if p and p not in sys.path:
+        sys.path.append(p)
+\end{pycode}
+%%
+\newcommand{\importandtypeset}[2][.]{%
+  \pyc{add_to_path('#1'); from #2 import *; pytex.add_dependencies(os.path.join('#1', '#2.py'))}%
+  \inputpygments{python}{#1/#2.py}%
+}
+%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% PYTHON GENERAL IMPORT %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{pythontexcustomcode}{py}
+# IMPORTS
+import numpy   as np
+import scipy   as sp
+import sympy   as sym
+import planets as pln
+import pylab   as plt
+from mpl_toolkits.basemap import Basemap
+# SETTINGS 
+from matplotlib import rc
+rc('text', usetex=True)
+rc('font', family='serif', serif='Times', size=12)
+# FUNCTIONS
+# printeg( [char1,char2,...] )
+# -- prints char1 = char2 = ...
+def printeg(arg,symbol=' = ',box=False):
+  zechar = '\[ '
+  if box: zechar = zechar + ' \\boxed{ '
+  nnn = len(arg)
+  for ii in range(nnn):
+    zechar = zechar + sym.latex(arg[ii])
+    if ii != nnn-1:
+      zechar = zechar + symbol
+  if box: zechar = zechar + ' } '  
+  zechar = zechar + ' \]'
+  print(zechar)
+\end{pythontexcustomcode}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\title{Cours}
+\author{Aymeric Spiga}
+
+
+
+\begin{document}
+\maketitle
+%\tableofcontents
+
+
+
+
+
+
+\section{Flux incident}
+
+\subsection{Variation géographique du flux incident (Loi de Malus)}
+
+\begin{pyblock}[incflux][fontsize=\scriptsize]
+E, Eloc, R = sym.symbols('\mathcal{E} \mathcal{E}_{loc} R', positive=True)
+phi, lam = sym.symbols('\phi \lambda')
+malus = E*sym.cos(phi)*sym.cos(lam)
+printeg( [Eloc,malus] )
+\end{pyblock} 
+\printpythontex
+
+\begin{pyblock}[incflux][fontsize=\scriptsize]
+Elocnumf = sym.lambdify((lam, phi), malus.subs(E,1), "numpy")
+angles = np.linspace(-np.pi/2,np.pi/2,num=25)
+X,Y = np.meshgrid(angles, angles)
+m = Basemap(projection='ortho',lon_0=20,lat_0=20,resolution='l')
+m.drawmapboundary(fill_color='k')
+mx, my = m(180.*X/np.pi,180.*Y/np.pi)
+m.contourf(mx,my,Elocnumf(X,Y),cmap=plt.cm.hot,levels=np.linspace(0,1,15))
+m.drawcoastlines()
+mx, my = m(0,0) 
+plt.plot(mx,my,'kx')
+plt.savefig('eloc.pdf', bbox_inches='tight') ; plt.close()
+\end{pyblock}
+\begin{figure}[h!]
+\begin{center}
+\includegraphics[width=0.25\textwidth]{eloc.pdf}
+\end{center}
+\end{figure}
+
+\subsection{Flux incident intégré sur la sphère : le facteur 4}
+
+\begin{pyblock}[incflux][fontsize=\scriptsize]
+Pi, Phii = sym.symbols('\mathcal{P}_i,\Phi_i', positive=True)
+integrand = Eloc*(R**2)*sym.cos(lam)
+i = sym.Integral(integrand,(phi,-sym.pi/2,sym.pi/2),(lam,-sym.pi/2,sym.pi/2))
+ii = i.subs(Eloc,malus)
+iii = ii.doit()
+printeg( [Pi,i,ii,iii] )
+sphere = 4*sym.pi*(R**2)
+printeg( [Phii, Pi/sphere, iii/sphere], box=True )
+\end{pyblock} 
+\printpythontex
+
+\section{Flux émis}
+
+\subsection{Loi de Planck}
+
+\begin{pyblock}[planck][fontsize=\scriptsize]
+BlT, h, c, lam, k, temp = sym.symbols('B_{\lambda}(T) h c \lambda k_B T') #, commutative=True)
+term = (h*c) / (lam*k*temp)
+planck = ( 2*h*c**2/(lam**5) ) / ( sym.exp(term) - 1 )
+printeg( [BlT,planck] )
+\end{pyblock}
+\printpythontex
+
+\subsection{Loi de Wien}
+
+\begin{pyblock}[planck][fontsize=\scriptsize]
+x,xm,lm = sym.symbols('x x_{max} \lambda_{max}')
+zemax = r'\frac{\partial B}{\partial \lambda}=0\qquad\textrm{en posant}\qquad '
+print('\['+zemax+sym.latex(sym.Eq(x,term))+'\]')
+f = sym.Function('B')(lam)
+f = planck # faire de la planckienne une fonction à une variable
+df = f.diff(lam)
+df = df.subs(lam,term.subs(lam,x)) # nécessaire pour solve
+df = sym.simplify(df) # esthétique
+i = sym.Eq(df,0)
+ii = sym.solve(i,x)[0]
+printeg( [i,sym.Eq(xm,ii)], symbol=' \qquad\Rightarrow\qquad ' ) 
+\end{pyblock}
+\printpythontex
+
+\begin{itemize}
+\item On the Lambert W function, Corless et al. (1993)
+\item The Lambert W Function and Quantum Statistics, Valluri et al. (2009)
+\end{itemize}
+
+\begin{pyblock}[planck][fontsize=\scriptsize]
+iii = term.subs(lam,xm)
+wien = term.subs([ (lam,ii), (h,pln.h), (c,pln.c), (k,pln.k) ]).evalf(4)
+printeg( [lm,iii,wien],  box=True )
+\end{pyblock}
+\printpythontex
+
+\subsection{Emission thermique typique d'étoiles et planètes}
+
+\begin{pyblock}[planck][fontsize=\scriptsize]
+plancknum = planck.subs([ (h,pln.h), (c,pln.c), (k,pln.k) ])
+plancknumf = sym.lambdify((lam, temp), plancknum, "numpy")
+numlam = np.logspace(-2,2,num=100)
+def plancknumfred(temp): return plancknumf(1e-6*numlam,temp)
+kel = [6000.,1000.,pln.Venus.T0,pln.Earth.T0,pln.Mars.T0,pln.Jupiter.T0,pln.Pluto.T0]
+col = ["y","g","c","b","r","m","k"]
+lab = ["Soleil","Naine brune","Venus","Terre","Mars","Jupiter","Pluton"]
+for i in range(len(kel)):
+  plt.plot(numlam,plancknumfred(kel[i]),color=col[i],label=lab[i])
+plt.semilogx()
+plt.xlabel("Longueur d'onde ($\mu$m)")
+plt.semilogy()
+plt.ylabel(r'W~m$^{-2}$~sr$^{-1}$~$\mu$m$^{-1}$')
+plt.ylim((1e-1,1e14))
+plt.title(sym.latex(BlT,mode="inline"))
+plt.legend(loc="lower left")
+plt.savefig('planck.pdf', bbox_inches='tight') ; plt.close()
+\end{pyblock}
+\begin{figure}[h!]
+\begin{center}
+\includegraphics[width=0.5\textwidth]{planck.pdf}
+\end{center}
+\end{figure}
+
+\begin{pyblock}[planck][fontsize=\scriptsize]
+print(r"\begin{center}\begin{tabular}{|c|c|c|}\hline")
+title = r" &" 
+title = title + sym.latex(temp,mode='inline') + r"~(K)" + r"&"
+title = title + sym.latex(lm,mode='inline') + r"~($\mu$m)" + r"\\ \hline"
+print(title) 
+for i in range(len(kel)):
+  line = r"%s & %.0f & %.1f \\ \hline"
+  print(line % (lab[i],kel[i],1.e6*wien.subs(temp,kel[i])))  
+print(r"\end{tabular}\end{center}")
+\end{pyblock} 
+\printpythontex
+
+\section{Equilibre radiatif}
+
+\subsection{Loi de Stefan-Boltzmann}
+
+\begin{pyblock}[planck][fontsize=\scriptsize]
+x = sym.Symbol('x')
+ib = sym.Integral(BlT,lam)
+i = sym.Integral(planck,lam) # integration
+f = lambda x: (h*c) / (x*k*temp) # changement de variable
+ii = i.transform(lam, (f(x),x)).doit() 
+printeg( [ib,i,ii] )
+\end{pyblock}
+\printpythontex
+
+%%%%%%%%%%%%%
+%L'intégrale à droite est un cas particulier de la distribution de Bose-Einstein
+%qui se calcule à l'aide du polylogarithme (ou fonction de Jonquière 1889)
+%%http://mathworld.wolfram.com/Bose-EinsteinDistribution.html
+%The integral on the right is standard and goes by many names: it is a particular case of a Bose-Einstein integral, or the Riemann zeta function zeta(4), or the Polylogarithm.
+%A special case of the Bose-Einstein distribution.
+%\[ Li_4(1) \Gamma(4) \]
+%Jonquière, Bulletin de la S. M. F., tome 17 (1889), p. 142-152
+%\begin{pyblock}[planck][fontsize=\scriptsize]
+%n,alph = sym.symbols('n \alpha')
+%f = x**n / (sym.exp(x)-1)
+%i = sym.Integral(f,(x,0,sym.oo)) 
+%#ii = i.doit() # ne sait pas faire
+%ii = sym.functions.special.zeta_functions.zeta(4,1) * sym.functions.special.gamma_functions.gamma(4)
+%#ii = sym.functions.special.zeta_functions.polylog(n+1,alph) * sym.functions.special.gamma_functions.gamma(n+1)
+%printeg( [i,ii] )
+%\end{pyblock}
+%\printpythontex
+%%%%%%%%%%%%%
+
+\begin{pyblock}[dlsigmaint][fontsize=\scriptsize]
+eps,x = sym.symbols('\epsilon x',positive=True)
+g = eps / (1-eps)
+dl = sym.series(g,eps,0,5)
+printeg( [g,dl] )
+printeg( [x**3*g.subs(eps,sym.exp(-x)),x**3*dl.subs(eps,sym.exp(-x))] )
+\end{pyblock}
+\printpythontex
+
+\begin{pyblock}[sigmaint][fontsize=\scriptsize]
+k,u,x = sym.symbols('k u x',positive=True)
+f = x**3 / (sym.exp(x)-1)
+i = sym.Integral(f,(x,0,sym.oo)) # .doit() marche pas
+g = x**3 * sym.exp(-k*x)
+s = sym.Sum(g,(k,1,sym.oo)) # .doit() same as above
+ii = sym.Integral(s,(x,0,sym.oo)) #
+iii = sym.Sum( sym.Integral(g,(x,0,sym.oo)), (k,1,sym.oo))
+iv = sym.Sum( sym.laplace_transform(x**3, x, k)[0], (k,1,sym.oo))
+v = iv.doit()
+printeg( [i,ii,iii,iv,v] )
+\end{pyblock}
+\printpythontex
+
+\noindent Chaque terme dans la somme est une intégrale convergente, à savoir : une transformée
+de Laplace de la fonction cube, donc le terme de sommation peut être sorti de l'intégrale.
+
+how to replace the integral by the result of the previous calculation
+
+\begin{pyblock}[planck][fontsize=\scriptsize]
+x = sym.Symbol('x',real=True)
+f = x**3 / (sym.exp(x)-1)
+cint = sym.Integral(f)
+vint = sym.pi**4 / 15
+fac = ii.subs(cint,vint)
+fac = sym.ratsimp(ii / cint)
+fac = ii.subs(x,0)
+printeg( [ib,fac] )
+\end{pyblock}
+\printpythontex
+
+%#eq = sym.Eq(x**3,sym.exp(x)-1)
+%#sol = sym.solve(eq)
+%#printeg( [sol] ) 
+
+%\begin{pyblock}[sigmaint][fontsize=\scriptsize]
+%BlT,lam = sym.symbols('B_{\lambda}(T) \lambda')
+%ib = sym.Integral(BlT,(lam,0,sym.oo))
+%printeg( [ib,v], box=True )
+%\end{pyblock}
+%\printpythontex
+
+
+%\begin{pyblock}[sigmaint][fontsize=\scriptsize]
+%alt = ii.transform(x,(u/k,u))
+%printeg( [ii,alt] )
+%\end{pyblock}
+%\printpythontex
+
+
+
+\end{document}
+
+
+
+
+\end{document}
+
+\begin{pyblock}[planck][fontsize=\scriptsize]
+eps,k,u,n,N = sym.symbols('\epsilon k u n N',positive=True)
+## marche pas 
+i = sym.Integral((x**3)*sym.exp(-k*x),(x,0,sym.oo))
+ii = i.transform(x,(u/k,u))
+iii = ii.doit()
+printeg( [i,ii,iii] )
+intsum = sym.Integral(sss,(x,0,n))
+sumint = sym.Sum(iii,(k,1,N))
+sumintdo = sumint.doit()
+printeg( [intsum,sumint,sumintdo] )
+ll = sym.limit(sumintdo, N, sym.oo)
+printeg( [intsum.subs(N,sym.oo),ll] )
+\end{pyblock}
+\printpythontex
+
+
+
+%#sympy does not know how to do this
+%#https://en.wikipedia.org/w/index.php?oldid=293273084#Appendix
+%n = sym.symbols('n')
+%i = sym.Integral(x**n/(sym.exp(x)-1),(x,0,np.inf))
+%ii = sym.functions.special.zeta_functions.zeta(n+1,1) * sym.functions.special.gamma_functions.gamma(n+1)
+%printeg( [i,ii] )
+%printeg( [i.subs(n,3),ii.subs(n,3)] )
+
+
+
+\end{document}
+
+\subsection{Equilibre radiatif simple}
+
+%\begin{pyblock}[][fontsize=\scriptsize]
+%Ab, Ep, Phii, Teq, sig = sym.symbols('A_b \mathcal{E}^{\prime} \Phi_i T_{eq} \sigma', positive=True)
+%sphere = 4*sym.pi*(R**2)
+%tr = 1-Ab 
+%expr = tr*iii.subs(E,4*Ep)/sphere
+%printeg( [Phii, tr*i/sphere, tr*iii/sphere, expr] )
+%Phii = expr
+%\end{pyblock} 
+%\printpythontex
+
+
+%% $\sigma=\py{sym.Float(pln.sigma,3)}$
+\begin{pyblock}[][fontsize=\scriptsize]
+print(r"\begin{center}\begin{tabular}{|c|c|c|c|c|}\hline")
+title = r" &" 
+title = title + sym.latex(Ab,mode='inline') + r"&"
+title = title + sym.latex(Ep,mode='inline') + r"~(W~m$^{-2}$)" + r"&" 
+title = title + sym.latex(Teq,mode='inline') + r"~(K)" + r"&" 
+title = title + r"$T_{s}~(K)$" + r"\\ \hline"
+print(title) 
+myp = pln.Planet()
+for ppp in ["Mercury","Venus","Earth","Mars","Jupiter","Saturn","Titan","Pluto"]:
+  myp.ini(ppp)
+  exprnum = expr.subs([ (Ab,myp.albedo), (Ep,myp.L/4.), (sig,pln.sigma) ]) 
+  line = r"%s & %.2f & %.1f & %.0f & %.0f \\ \hline"
+  print(line % (myp.name,myp.albedo,myp.L/4.,exprnum,myp.Tsbar))
+print(r"\end{tabular}\end{center}")
+\end{pyblock} 
+\printpythontex
+
+
+\end{document}
+
+
+
+
+
+
+\end{document}
+
+
+
+
+\end{document}
+
+
+\end{document}
+
+
+
+
+%%%% NON
+%\begin{pycode}
+%tau,sig,olr = sym.symbols('\tau \sigma OLR')
+%fp,fm,T = sym.symbols('F^+ F^- T',cls=sym.Function)
+%eq1 = sym.Eq( fp(tau).diff(tau)-fp(tau) , -fm(tau)-fm(tau).diff(tau) )
+%ics = {fp(0): olr, fm(0): 0}
+%sol = sym.dsolve(eq1,[fp(tau),fm(tau)], ics=ics)
+%#printeg( [sys,sol], symbol=' \qquad\Rightarrow\qquad ' )
+%\end{pycode}
+%\end{document}
+
+
+
+
+
+
+
+
+
+\begin{pycode}
+
+i = sym.symbols('i')
+x = sym.symbols('x',positive=True)
+tef = sym.summation(sym.exp(-i*x),(i,0,np.inf))
+print('\[' + sym.latex(tef) + '\]')
+
+
+
+#i = sp.integrate(planck,(lam,0,inf))
+#print('\[' + latex(i) + '\]')
+#i = sp.integrals.integrate(planck,(lam,1e-9,1e3))
+#print('\[' + latex(i) + '\]')
+## marche pas
+#i = Integral(interm,(lam,0,inf))
+#ii = i.doit()
+#print('\[' + latex(i) + ' = ' + latex(ii) + '\]')
+
+\end{pycode}
+\end{document}
+
+
+\begin{pyblock}[][fontsize=\scriptsize]
+expr = sig*teq**4
+printeg( [Phio,expr] )
+Phio = expr
+
+eqrad = sym.Eq(Phii,Phio)
+print(sym.latex(eqrad,mode='equation'))
+
+sol = sym.solve(Phii-Phio,teq**4) 
+expr = sym.root(sol[0],4)
+print(sym.latex(sym.Eq(teq,expr),mode='equation'))
+\end{pyblock} 
+\printpythontex
+
+
+$h=\pyc{planets.h}$
+
+
+
+\importandtypeset{escape}
+\pyc{pytex.add_created("escape.pdf")}
+\includegraphics[width=\textwidth]{escape.pdf}
+
+%%\begin{pyblock}
+%\begin{pycode}
+%\input{escape.py}
+%\end{pycode}
+%%\end{pyblock}
+%\includegraphics[width=\textwidth]{escape.pdf}
+
+
+\end{document}
